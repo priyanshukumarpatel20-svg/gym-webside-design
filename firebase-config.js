@@ -8,12 +8,12 @@
 // 5. Copy your Firebase config and replace the values below
 
 const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_PROJECT_ID.appspot.com",
-    messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-    appId: "YOUR_APP_ID"
+    apiKey: "AIzaSyAfeNHt-VZEPX9s79vlNmmhmqf8kOJW6_U",
+    authDomain: "dvintage-era-gym.firebaseapp.com",
+    projectId: "dvintage-era-gym",
+    storageBucket: "dvintage-era-gym.firebasestorage.app",
+    messagingSenderId: "999789119042",
+    appId: "1:999789119042:web:694a5920c67d2d7c38cfdb"
 };
 
 // Initialize Firebase
