@@ -26,6 +26,7 @@
                     <li><a href="#home">Home</a></li>
                     <li><a href="#about">About</a></li>
                     <li><a href="#programs">Programs</a></li>
+                    <li><a href="#events">Events</a></li>
                     <li><a href="#membership">Membership</a></li>
                     <li><a href="#contact">Contact</a></li>
                 </ul>
@@ -208,6 +209,50 @@
                         </ul>
                         <a href="#contact" class="btn btn-outline">Choose Plan</a>
                     </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Events Section -->
+        <section class="events-section" id="events">
+            <div class="section-container">
+                <div class="events-header">
+                    <h2 class="section-title">Upcoming Events</h2>
+                    <button id="adminAddEventBtn" class="btn btn-outline events-admin-btn">+ Add Event (Owner)</button>
+                </div>
+
+                <!-- Admin form to add a new event, hidden until owner unlocks it -->
+                <div class="event-admin-form-wrapper" id="eventAdminFormWrapper" style="display:none;">
+                    <h3>Add New Event</h3>
+                    <form id="eventAdminForm">
+                        <div class="form-group">
+                            <input type="text" id="eventTitle" placeholder="Event Title" required>
+                        </div>
+                        <div class="form-group">
+                            <textarea id="eventDescription" rows="3" placeholder="Event Description (optional)"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label class="event-form-label">Event Date &amp; Time</label>
+                            <input type="datetime-local" id="eventDateTime" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="event-form-label">Registration Fee (Rs, optional)</label>
+                            <input type="number" id="eventFee" placeholder="e.g. 200" min="0">
+                        </div>
+                        <div class="form-group">
+                            <label class="event-form-label">Event Photo (full size)</label>
+                            <input type="file" id="eventPhoto" accept="image/*" required>
+                            <img id="eventPhotoPreview" class="event-photo-preview" style="display:none;">
+                        </div>
+                        <div class="event-admin-form-actions">
+                            <button type="submit" class="btn btn-primary">Publish Event</button>
+                            <button type="button" id="cancelAddEventBtn" class="btn btn-outline">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div id="eventsGrid" class="events-grid">
+                    <p class="events-empty">No upcoming events right now. Check back soon!</p>
                 </div>
             </div>
         </section>
