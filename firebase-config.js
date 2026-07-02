@@ -18,6 +18,7 @@ const firebaseConfig = {
 
 // Initialize Firebase
 let db = null;
+let auth = null;
 
 (function() {
     try {
@@ -32,11 +33,13 @@ let db = null;
         // Get Firestore database instance if initialized
         if (firebase.apps.length > 0) {
             db = firebase.firestore();
+            auth = firebase.auth();
         }
     } catch (e) {
         console.log('Firebase initialization skipped:', e.message);
     }
 })();
 
-// Export db for use in other scripts
+// Export db and auth for use in other scripts
 window.db = db;
+window.auth = auth;
