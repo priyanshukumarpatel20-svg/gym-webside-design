@@ -12,6 +12,8 @@
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
 </head>
 <body>
     <!-- Navigation Bar -->
@@ -27,6 +29,7 @@
                     <li><a href="#about">About</a></li>
                     <li><a href="#programs">Programs</a></li>
                     <li><a href="#events">Events</a></li>
+                    <li><a href="#tutorials">Tutorials</a></li>
                     <li><a href="#membership">Membership</a></li>
                     <li><a href="#contact">Contact</a></li>
                 </ul>
@@ -218,10 +221,49 @@
             <div class="section-container">
                 <div class="events-header">
                     <h2 class="section-title">Upcoming Events</h2>
-                    <button id="adminAddEventBtn" class="btn btn-outline events-admin-btn">+ Add Event (Owner)</button>
+                    <div class="events-owner-controls">
+                        <button id="ownerLoginBtn" class="btn btn-outline events-admin-btn">Owner Login</button>
+                        <button id="ownerChangePasswordBtn" class="btn btn-outline events-admin-btn" style="display:none;">Change Password</button>
+                        <button id="adminAddEventBtn" class="btn btn-primary events-admin-btn" style="display:none;">+ Add Event</button>
+                        <button id="ownerLogoutBtn" class="btn btn-outline events-admin-btn" style="display:none;">Logout</button>
+                    </div>
                 </div>
 
-                <!-- Admin form to add a new event, hidden until owner unlocks it -->
+                <!-- Owner Login Form (Firebase Authentication) -->
+                <div class="event-owner-login-wrapper" id="eventOwnerLoginWrapper" style="display:none;">
+                    <h3>Owner Login</h3>
+                    <form id="ownerLoginForm">
+                        <div class="form-group">
+                            <input type="email" id="ownerLoginEmail" placeholder="Email" required>
+                        </div>
+                        <div class="form-group">
+                            <input type="password" id="ownerLoginPassword" placeholder="Password" required>
+                        </div>
+                        <div class="event-admin-form-actions">
+                            <button type="submit" class="btn btn-primary">Login</button>
+                            <button type="button" id="ownerLoginCancelBtn" class="btn btn-outline">Cancel</button>
+                        </div>
+                        <p class="event-owner-forgot-link"><a href="#" id="ownerForgotPasswordLink">Forgot Password?</a></p>
+                        <p class="event-owner-login-message" id="ownerLoginMessage"></p>
+                    </form>
+                </div>
+
+                <!-- Change Password Form (shown after login) -->
+                <div class="event-owner-login-wrapper" id="ownerChangePasswordWrapper" style="display:none;">
+                    <h3>Change Password</h3>
+                    <form id="ownerChangePasswordForm">
+                        <div class="form-group">
+                            <input type="password" id="ownerNewPassword" placeholder="New Password (min 6 characters)" required minlength="6">
+                        </div>
+                        <div class="event-admin-form-actions">
+                            <button type="submit" class="btn btn-primary">Update Password</button>
+                            <button type="button" id="ownerChangePasswordCancelBtn" class="btn btn-outline">Cancel</button>
+                        </div>
+                        <p class="event-owner-login-message" id="ownerChangePasswordMessage"></p>
+                    </form>
+                </div>
+
+                <!-- Admin form to add a new event, hidden until owner logs in -->
                 <div class="event-admin-form-wrapper" id="eventAdminFormWrapper" style="display:none;">
                     <h3>Add New Event</h3>
                     <form id="eventAdminForm">
@@ -332,6 +374,15 @@
                             <div class="form-group">
                                 <textarea id="feedbackMessage" rows="4" placeholder="Your Feedback" required></textarea>
                             </div>
+                            <div class="form-group">
+                                <label class="event-form-label">Add a Photo (optional)</label>
+                                <input type="file" id="feedbackPhoto" accept="image/*">
+                                <img id="feedbackPhotoPreview" class="event-photo-preview" style="display:none;">
+                            </div>
+                            <div class="form-group">
+                                <label class="event-form-label">YouTube Video Link (optional)</label>
+                                <input type="url" id="feedbackVideo" placeholder="https://youtube.com/watch?v=...">
+                            </div>
                             <button type="submit" class="btn btn-primary">Submit Feedback</button>
                         </form>
                     </div>
@@ -345,7 +396,56 @@
                 </div>
             </div>
         </section>
+
+        <!-- Exercise Tutorials Section -->
+        <section class="tutorials-section" id="tutorials">
+            <div class="section-container">
+                <div class="events-header">
+                    <h2 class="section-title">Exercise Tutorials</h2>
+                    <button id="addTutorialBtn" class="btn btn-primary events-admin-btn" style="display:none;">+ Add Tutorial</button>
+                </div>
+
+                <div class="tutorial-admin-form-wrapper" id="tutorialAdminFormWrapper" style="display:none;">
+                    <h3>Add New Tutorial</h3>
+                    <form id="tutorialAdminForm">
+                        <div class="form-group">
+                            <input type="text" id="tutorialTitle" placeholder="Exercise Name (e.g. Barbell Squat)" required>
+                        </div>
+                        <div class="form-group">
+                            <select id="tutorialCategory" required>
+                                <option value="">Select Category</option>
+                                <option value="Chest">Chest</option>
+                                <option value="Back">Back</option>
+                                <option value="Legs">Legs</option>
+                                <option value="Shoulders">Shoulders</option>
+                                <option value="Arms">Arms</option>
+                                <option value="Core">Core</option>
+                                <option value="Cardio">Cardio</option>
+                                <option value="Full Body">Full Body</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <input type="url" id="tutorialVideoUrl" placeholder="YouTube Video Link" required>
+                        </div>
+                        <div class="form-group">
+                            <textarea id="tutorialInstructions" rows="4" placeholder="How to do this exercise (step by step)" required></textarea>
+                        </div>
+                        <div class="event-admin-form-actions">
+                            <button type="submit" class="btn btn-primary">Publish Tutorial</button>
+                            <button type="button" id="cancelAddTutorialBtn" class="btn btn-outline">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="tutorial-category-filters" id="tutorialCategoryFilters"></div>
+
+                <div id="tutorialsGrid" class="events-grid">
+                    <p class="events-empty">No tutorials yet. Check back soon!</p>
+                </div>
+            </div>
+        </section>
     </main>
+
 
     <!-- Footer -->
     <footer class="footer">
