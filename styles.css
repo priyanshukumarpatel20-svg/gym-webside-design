@@ -797,6 +797,58 @@ body {
     color: var(--text-light);
 }
 
+.events-owner-controls {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.owner-login-overlay {
+    position: fixed;
+    inset: 0;
+    background-color: rgba(15, 20, 25, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    padding: 1.5rem;
+}
+
+.owner-login-box {
+    background-color: var(--white);
+    border-radius: 10px;
+    padding: 2.5rem;
+    width: 100%;
+    max-width: 380px;
+    position: relative;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+}
+
+.owner-login-box h3 {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--text-dark);
+    margin-bottom: 1.5rem;
+}
+
+.owner-login-close {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    line-height: 1;
+    cursor: pointer;
+    color: var(--text-light);
+}
+
+.owner-login-error {
+    color: #dc2626;
+    font-size: 0.85rem;
+    margin: -0.5rem 0 1rem;
+}
+
 /* Events Section */
 .events-section {
     padding: 6rem 0;
@@ -816,8 +868,50 @@ body {
     margin-bottom: 0;
 }
 
+.events-owner-controls {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
 .events-admin-btn {
     white-space: nowrap;
+}
+
+.event-owner-login-wrapper {
+    background-color: var(--gray-light);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 2rem;
+    margin-bottom: 3rem;
+    max-width: 420px;
+}
+
+.event-owner-login-wrapper h3 {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--text-dark);
+    margin-bottom: 1.5rem;
+}
+
+.event-owner-forgot-link {
+    margin-top: 0.75rem;
+    font-size: 0.85rem;
+}
+
+.event-owner-forgot-link a {
+    color: var(--primary-blue);
+    text-decoration: underline;
+}
+
+.event-owner-login-message {
+    margin-top: 0.75rem;
+    font-size: 0.85rem;
+    color: #dc2626;
+}
+
+.event-owner-login-message.success {
+    color: #16a34a;
 }
 
 .event-admin-form-wrapper {
@@ -996,6 +1090,200 @@ body {
     font-size: 0.9rem;
     color: #16a34a;
     font-weight: 600;
+}
+
+/* Feedback media, likes, comments */
+.feedback-item-media {
+    margin: 0.75rem 0;
+}
+
+.feedback-item-photo {
+    max-width: 100%;
+    max-height: 320px;
+    border-radius: 8px;
+    display: block;
+    object-fit: cover;
+}
+
+.feedback-item-video {
+    position: relative;
+    width: 100%;
+    max-width: 480px;
+    aspect-ratio: 16 / 9;
+    margin-top: 0.5rem;
+}
+
+.feedback-item-video iframe {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    border-radius: 8px;
+}
+
+.feedback-item-actions {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.feedback-like-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: var(--text-light);
+    font-family: inherit;
+    padding: 0;
+}
+
+.feedback-like-btn.liked {
+    color: #dc2626;
+    font-weight: 700;
+}
+
+.feedback-comment-toggle-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: var(--text-light);
+    font-family: inherit;
+    padding: 0;
+}
+
+.feedback-delete-btn {
+    margin-left: auto;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: #dc2626;
+    font-family: inherit;
+    padding: 0;
+    text-decoration: underline;
+}
+
+.feedback-comments-section {
+    display: none;
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.feedback-comments-section.open {
+    display: block;
+}
+
+.feedback-comment-item {
+    font-size: 0.85rem;
+    color: var(--text-dark);
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.feedback-comment-item .comment-author {
+    font-weight: 700;
+    margin-right: 0.4rem;
+}
+
+.feedback-comment-form {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+}
+
+.feedback-comment-form input {
+    flex-grow: 1;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 0.85rem;
+}
+
+.feedback-comment-form button {
+    white-space: nowrap;
+}
+
+/* Tutorials Section */
+.tutorials-section {
+    padding: 6rem 0;
+    background-color: var(--gray-light);
+}
+
+.tutorial-admin-form-wrapper {
+    background-color: var(--white);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    max-width: 500px;
+}
+
+.tutorial-admin-form-wrapper h3 {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--text-dark);
+    margin-bottom: 1.5rem;
+}
+
+.tutorial-admin-form-wrapper select {
+    width: 100%;
+    padding: 0.65rem 0.9rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 0.95rem;
+}
+
+.tutorial-category-filters {
+    display: flex;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    margin-bottom: 2rem;
+}
+
+.tutorial-category-filter-btn {
+    padding: 0.5rem 1.1rem;
+    border-radius: 999px;
+    border: 1px solid var(--border-color);
+    background-color: var(--white);
+    color: var(--text-dark);
+    font-family: inherit;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.tutorial-category-filter-btn.active {
+    background-color: var(--primary-blue);
+    color: var(--white);
+    border-color: var(--primary-blue);
+}
+
+.tutorial-card-category {
+    display: inline-block;
+    background-color: var(--gray-light);
+    color: var(--primary-blue);
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 0.25rem 0.7rem;
+    border-radius: 999px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.tutorial-card-instructions {
+    font-size: 0.9rem;
+    color: var(--text-light);
+    line-height: 1.6;
+    white-space: pre-line;
 }
 
 /* Footer */
