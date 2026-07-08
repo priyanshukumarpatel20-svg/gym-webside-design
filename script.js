@@ -542,8 +542,10 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         // ---- Show/hide owner controls based on real login state ----
+        let isEventsOwnerLoggedIn = false;
         function applyAuthUI(user) {
             const isOwner = !!user;
+            isEventsOwnerLoggedIn = isOwner;
             ownerLoginBtn.style.display = isOwner ? 'none' : 'inline-block';
             ownerChangePasswordBtn.style.display = isOwner ? 'inline-block' : 'none';
             adminAddEventBtn.style.display = isOwner ? 'inline-block' : 'none';
@@ -551,6 +553,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (!isOwner) {
                 hideAllOwnerPanels();
             }
+            renderEvents();
         }
 
         // ---- Owner login (inline form) ----
@@ -915,6 +918,11 @@ document.addEventListener('DOMContentLoaded', function () {
                             '<button type="submit" class="btn btn-primary">Confirm Registration</button>' +
                             '<p class="event-registration-success" style="display:none;">Registration successful! See you at the event.</p>' +
                         '</form>' +
+                        (isEventsOwnerLoggedIn ?
+                            '<button type="button" class="btn btn-outline event-view-registrations-btn">View Registrations</button>' +
+                            '<div class="event-registrations-panel" style="display:none;"><p class="event-registrations-loading">Loading...</p></div>' +
+                            '<button type="button" class="btn btn-outline event-delete-btn">Delete Event</button>'
+                        : '') +
                     '</div>';
 
                 eventsGrid.appendChild(card);
@@ -962,9 +970,92 @@ document.addEventListener('DOMContentLoaded', function () {
 
                     return false;
                 };
+
+                const viewRegBtn = card.querySelector('.event-view-registrations-btn');
+                const regPanel = card.querySelector('.event-registrations-panel');
+                if (viewRegBtn) {
+                    viewRegBtn.addEventListener('click', function () {
+                        const isOpen = regPanel.style.display === 'block';
+                        if (isOpen) {
+                            regPanel.style.display = 'none';
+                            viewRegBtn.textContent = 'View Registrations';
+                            return;
+                        }
+                        regPanel.style.display = 'block';
+                        viewRegBtn.textContent = 'Hide Registrations';
+                        loadRegistrationsForEvent(evt.id, regPanel);
+                    });
+                }
+
+                const deleteEventBtn = card.querySelector('.event-delete-btn');
+                if (deleteEventBtn) {
+                    deleteEventBtn.addEventListener('click', function () {
+                        if (!confirm('Delete "' + evt.title + '"? This cannot be undone.')) return;
+
+                        function finishDelete() {
+                            events = events.filter(function (e) { return e.id !== evt.id; });
+                            renderEvents();
+                        }
+
+                        if (eventsCollection && evt.id) {
+                            eventsCollection.doc(evt.id).delete().then(finishDelete).catch(function (error) {
+                                console.error('Error deleting event:', error);
+                                alert('Could not delete this event. Please try again.');
+                            });
+                        } else {
+                            try {
+                                const stored = localStorage.getItem('gymEvents');
+                                const list = stored ? JSON.parse(stored) : [];
+                                localStorage.setItem('gymEvents', JSON.stringify(list.filter(e => e.id !== evt.id)));
+                            } catch (e) {
+                                console.error('LocalStorage error (delete event):', e);
+                            }
+                            finishDelete();
+                        }
+                    });
+                }
             });
 
             startCountdowns();
+        }
+
+        function loadRegistrationsForEvent(eventId, panelEl) {
+            panelEl.innerHTML = '<p class="event-registrations-loading">Loading...</p>';
+
+            function renderRegList(regs) {
+                if (!regs.length) {
+                    panelEl.innerHTML = '<p class="event-registrations-empty">No registrations yet.</p>';
+                    return;
+                }
+                let html = '<p class="event-registrations-count">' + regs.length + ' registration' + (regs.length === 1 ? '' : 's') + '</p>';
+                regs.forEach(function (r) {
+                    html += '<div class="event-registration-item">' +
+                        '<span class="reg-item-name">' + escapeHtmlLocal(r.name) + '</span>' +
+                        '<span class="reg-item-phone">' + escapeHtmlLocal(r.phone) + '</span>' +
+                        (r.paymentDetails ? '<span class="reg-item-payment">' + escapeHtmlLocal(r.paymentDetails) + '</span>' : '') +
+                        '</div>';
+                });
+                panelEl.innerHTML = html;
+            }
+
+            if (registrationsCollection) {
+                registrationsCollection.where('eventId', '==', eventId).get().then(function (snapshot) {
+                    const regs = [];
+                    snapshot.forEach(function (doc) { regs.push(doc.data()); });
+                    renderRegList(regs);
+                }).catch(function (error) {
+                    console.error('Error loading registrations:', error);
+                    panelEl.innerHTML = '<p class="event-registrations-empty">Could not load registrations.</p>';
+                });
+            } else {
+                try {
+                    const stored = localStorage.getItem('gymEventRegistrations');
+                    const all = stored ? JSON.parse(stored) : [];
+                    renderRegList(all.filter(r => r.eventId === eventId));
+                } catch (e) {
+                    panelEl.innerHTML = '<p class="event-registrations-empty">Could not load registrations.</p>';
+                }
+            }
         }
 
         function saveRegistrationToLocalStorage(registration) {
