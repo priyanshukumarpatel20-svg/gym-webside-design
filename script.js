@@ -60,6 +60,22 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    // ---- Mobile hamburger menu ----
+    const navToggle = document.getElementById('navToggle');
+    const navMenu = document.getElementById('navMenu');
+    if (navToggle && navMenu) {
+        navToggle.addEventListener('click', function () {
+            navMenu.classList.toggle('active');
+            navToggle.classList.toggle('active');
+        });
+        navMenu.querySelectorAll('a').forEach(function (link) {
+            link.addEventListener('click', function () {
+                navMenu.classList.remove('active');
+                navToggle.classList.remove('active');
+            });
+        });
+    }
+
     // Feedback form and star rating
     const feedbackForm = document.getElementById('feedbackForm');
     const feedbackNameInput = document.getElementById('feedbackName');
@@ -1115,6 +1131,530 @@ document.addEventListener('DOMContentLoaded', function () {
             applyAuthUI(null);
         }
         loadEvents();
+    })();
+
+    // ==========================================
+    // MEMBERSHIP TRACKER FEATURE
+    // Owner adds members with a validity period; live countdown with
+    // color stages; owner-only WhatsApp reminders, renewals, attendance,
+    // history and CSV export; public self-check by phone number.
+    // ==========================================
+    (function initMembersFeature() {
+        const addMemberBtn = document.getElementById('addMemberBtn');
+        const exportMembersBtn = document.getElementById('exportMembersBtn');
+        const membersDashboard = document.getElementById('membersDashboard');
+        const statActiveCount = document.getElementById('statActiveCount');
+        const statExpiringCount = document.getElementById('statExpiringCount');
+        const statExpiredCount = document.getElementById('statExpiredCount');
+        const selfCheckPhone = document.getElementById('selfCheckPhone');
+        const selfCheckBtn = document.getElementById('selfCheckBtn');
+        const selfCheckResult = document.getElementById('selfCheckResult');
+        const memberAdminFormWrapper = document.getElementById('memberAdminFormWrapper');
+        const memberAdminForm = document.getElementById('memberAdminForm');
+        const cancelAddMemberBtn = document.getElementById('cancelAddMemberBtn');
+        const memberValidityPresets = document.getElementById('memberValidityPresets');
+        const memberValidityDaysInput = document.getElementById('memberValidityDays');
+        const memberPhotoInput = document.getElementById('memberPhoto');
+        const memberPhotoPreview = document.getElementById('memberPhotoPreview');
+        const memberSearchWrapper = document.getElementById('memberSearchWrapper');
+        const memberSearchInput = document.getElementById('memberSearchInput');
+        const membersGrid = document.getElementById('membersGrid');
+
+        if (!membersGrid) return;
+
+        const DAY_MS = 24 * 60 * 60 * 1000;
+        let membersCollection = null;
+        let members = [];
+        let memberCompressedPhoto = null;
+        let memberCountdownInterval = null;
+        let isMembersOwnerLoggedIn = false;
+        let searchTerm = '';
+
+        function initMembersFirebase() {
+            try {
+                const database = window.db;
+                if (typeof firebase !== 'undefined' && database) {
+                    membersCollection = database.collection('members');
+                }
+            } catch (e) {
+                console.warn('Firebase not configured for members:', e.message);
+            }
+        }
+
+        function escapeHtmlLocal(str) {
+            const div = document.createElement('div');
+            div.textContent = str == null ? '' : String(str);
+            return div.innerHTML;
+        }
+
+        function todayStr() {
+            return new Date().toISOString().slice(0, 10);
+        }
+
+        function formatDate(ms) {
+            return new Date(ms).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+        }
+
+        // ---- Owner UI toggling ----
+        onOwnerAuthChange(function (loggedIn) {
+            isMembersOwnerLoggedIn = loggedIn;
+            addMemberBtn.style.display = loggedIn ? 'inline-block' : 'none';
+            exportMembersBtn.style.display = loggedIn ? 'inline-block' : 'none';
+            membersDashboard.style.display = loggedIn ? 'grid' : 'none';
+            memberSearchWrapper.style.display = loggedIn ? 'block' : 'none';
+            if (!loggedIn) {
+                memberAdminFormWrapper.style.display = 'none';
+            }
+            renderMembers();
+        });
+
+        if (addMemberBtn) {
+            addMemberBtn.addEventListener('click', function () {
+                const isOpen = memberAdminFormWrapper.style.display === 'block';
+                memberAdminFormWrapper.style.display = isOpen ? 'none' : 'block';
+                if (!isOpen) memberAdminFormWrapper.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            });
+        }
+
+        if (cancelAddMemberBtn) {
+            cancelAddMemberBtn.addEventListener('click', function () {
+                memberAdminFormWrapper.style.display = 'none';
+                memberAdminForm.reset();
+                memberCompressedPhoto = null;
+                memberPhotoPreview.style.display = 'none';
+                memberValidityPresets.querySelectorAll('.validity-preset-btn').forEach(b => b.classList.remove('active'));
+            });
+        }
+
+        if (memberValidityPresets) {
+            memberValidityPresets.querySelectorAll('.validity-preset-btn').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    memberValidityDaysInput.value = btn.dataset.days;
+                    memberValidityPresets.querySelectorAll('.validity-preset-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                });
+            });
+        }
+
+        if (memberPhotoInput) {
+            memberPhotoInput.addEventListener('change', function () {
+                const file = memberPhotoInput.files[0];
+                if (!file) return;
+                compressImageFile(file, 800, 0.7).then(function (dataUrl) {
+                    memberCompressedPhoto = dataUrl;
+                    memberPhotoPreview.src = dataUrl;
+                    memberPhotoPreview.style.display = 'block';
+                }).catch(function () {
+                    alert('Could not read this image. Please try a different photo.');
+                });
+            });
+        }
+
+        // ---- Add member ----
+        if (memberAdminForm) {
+            memberAdminForm.onsubmit = function (e) {
+                e.preventDefault();
+
+                const name = document.getElementById('memberName').value.trim();
+                const phone = document.getElementById('memberPhone').value.trim();
+                const days = parseInt(memberValidityDaysInput.value, 10);
+
+                if (!name || !phone || !days || days < 1) {
+                    alert('Please fill in name, phone, and a valid number of days.');
+                    return false;
+                }
+
+                const startDate = Date.now();
+                const expiryDate = startDate + days * DAY_MS;
+
+                const newMember = {
+                    name: name,
+                    phone: phone,
+                    photoBase64: memberCompressedPhoto || null,
+                    startDate: startDate,
+                    validityDays: days,
+                    expiryDate: expiryDate,
+                    history: [{ date: startDate, daysAdded: days, note: 'Joined' }],
+                    attendance: [],
+                    createdAt: startDate
+                };
+
+                const submitBtn = memberAdminForm.querySelector('button[type="submit"]');
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Adding...';
+
+                function finishAdd() {
+                    memberAdminForm.reset();
+                    memberCompressedPhoto = null;
+                    memberPhotoPreview.style.display = 'none';
+                    memberValidityPresets.querySelectorAll('.validity-preset-btn').forEach(b => b.classList.remove('active'));
+                    memberAdminFormWrapper.style.display = 'none';
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Add Member';
+                    loadMembers();
+                    alert('Member added!');
+                }
+
+                if (membersCollection) {
+                    membersCollection.add(newMember).then(finishAdd).catch(function (error) {
+                        console.error('Error adding member:', error);
+                        saveMemberToLocalStorage(newMember);
+                        finishAdd();
+                    });
+                } else {
+                    saveMemberToLocalStorage(newMember);
+                    finishAdd();
+                }
+
+                return false;
+            };
+        }
+
+        function saveMemberToLocalStorage(member) {
+            try {
+                const stored = localStorage.getItem('gymMembers');
+                const list = stored ? JSON.parse(stored) : [];
+                member.id = 'local_' + Date.now();
+                list.push(member);
+                localStorage.setItem('gymMembers', JSON.stringify(list));
+            } catch (e) {
+                console.error('LocalStorage error (members):', e);
+            }
+        }
+
+        function loadMembersFromLocalStorage() {
+            try {
+                const stored = localStorage.getItem('gymMembers');
+                members = stored ? JSON.parse(stored) : [];
+            } catch (e) {
+                members = [];
+            }
+            renderMembers();
+        }
+
+        function loadMembers() {
+            if (membersCollection) {
+                membersCollection.get().then(function (snapshot) {
+                    members = [];
+                    snapshot.forEach(function (doc) {
+                        const data = doc.data();
+                        members.push({
+                            id: doc.id,
+                            name: data.name,
+                            phone: data.phone,
+                            photoBase64: data.photoBase64 || null,
+                            startDate: data.startDate,
+                            validityDays: data.validityDays,
+                            expiryDate: data.expiryDate,
+                            history: data.history || [],
+                            attendance: data.attendance || []
+                        });
+                    });
+                    renderMembers();
+                }).catch(function (error) {
+                    console.error('Error loading members:', error);
+                    loadMembersFromLocalStorage();
+                });
+            } else {
+                loadMembersFromLocalStorage();
+            }
+        }
+
+        function saveMemberUpdate(member, updateFields) {
+            if (membersCollection && member.id && !String(member.id).startsWith('local_')) {
+                return membersCollection.doc(member.id).update(updateFields);
+            }
+            // localStorage fallback
+            try {
+                const stored = localStorage.getItem('gymMembers');
+                const list = stored ? JSON.parse(stored) : [];
+                const idx = list.findIndex(m => m.id === member.id);
+                if (idx !== -1) {
+                    list[idx] = Object.assign({}, list[idx], updateFields);
+                    localStorage.setItem('gymMembers', JSON.stringify(list));
+                }
+            } catch (e) {
+                console.error('LocalStorage error (update member):', e);
+            }
+            return Promise.resolve();
+        }
+
+        function getStatus(expiryDate) {
+            const msLeft = expiryDate - Date.now();
+            if (msLeft <= 0) return 'expired';
+            if (msLeft <= 48 * 60 * 60 * 1000) return 'danger';
+            if (msLeft <= 10 * DAY_MS) return 'warning';
+            return 'ok';
+        }
+
+        function updateDashboard() {
+            let active = 0, expiring = 0, expired = 0;
+            members.forEach(function (m) {
+                const status = getStatus(m.expiryDate);
+                if (status === 'expired') expired++;
+                else if (status === 'warning' || status === 'danger') expiring++;
+                else active++;
+            });
+            statActiveCount.textContent = active;
+            statExpiringCount.textContent = expiring;
+            statExpiredCount.textContent = expired;
+        }
+
+        // ---- Self check (public) ----
+        if (selfCheckBtn) {
+            selfCheckBtn.addEventListener('click', function () {
+                const phone = selfCheckPhone.value.trim();
+                if (!phone) {
+                    selfCheckResult.innerHTML = '<p style="color:#dc2626;">Please enter your phone number.</p>';
+                    return;
+                }
+                const match = members.find(m => m.phone === phone);
+                if (!match) {
+                    selfCheckResult.innerHTML = '<p>No membership found for this number.</p>';
+                    return;
+                }
+                const status = getStatus(match.expiryDate);
+                if (status === 'expired') {
+                    selfCheckResult.innerHTML = '<p style="color:#dc2626; font-weight:600;">Hi ' + escapeHtmlLocal(match.name) + ', your membership expired on ' + formatDate(match.expiryDate) + '. Please contact the gym to renew.</p>';
+                } else {
+                    const daysLeft = Math.ceil((match.expiryDate - Date.now()) / DAY_MS);
+                    selfCheckResult.innerHTML = '<p style="color:#16a34a; font-weight:600;">Hi ' + escapeHtmlLocal(match.name) + ', your membership is active with ' + daysLeft + ' day' + (daysLeft === 1 ? '' : 's') + ' remaining (expires ' + formatDate(match.expiryDate) + ').</p>';
+                }
+            });
+        }
+
+        // ---- Search ----
+        if (memberSearchInput) {
+            memberSearchInput.addEventListener('input', function () {
+                searchTerm = memberSearchInput.value.trim().toLowerCase();
+                renderMembers();
+            });
+        }
+
+        // ---- CSV export ----
+        if (exportMembersBtn) {
+            exportMembersBtn.addEventListener('click', function () {
+                let csv = 'Name,Phone,Start Date,Validity Days,Expiry Date,Status\n';
+                members.forEach(function (m) {
+                    const status = getStatus(m.expiryDate);
+                    csv += [
+                        '"' + (m.name || '').replace(/"/g, '""') + '"',
+                        '"' + (m.phone || '') + '"',
+                        formatDate(m.startDate),
+                        m.validityDays,
+                        formatDate(m.expiryDate),
+                        status
+                    ].join(',') + '\n';
+                });
+                const blob = new Blob([csv], { type: 'text/csv' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'gym-members.csv';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            });
+        }
+
+        function renderMembers() {
+            if (memberCountdownInterval) {
+                clearInterval(memberCountdownInterval);
+                memberCountdownInterval = null;
+            }
+
+            updateDashboard();
+            membersGrid.innerHTML = '';
+
+            const filtered = members.filter(function (m) {
+                if (!searchTerm) return true;
+                return (m.name || '').toLowerCase().includes(searchTerm) || (m.phone || '').includes(searchTerm);
+            });
+
+            if (!filtered.length) {
+                membersGrid.innerHTML = '<p class="events-empty">No members added yet.</p>';
+                return;
+            }
+
+            const sorted = [...filtered].sort((a, b) => a.expiryDate - b.expiryDate);
+
+            sorted.forEach(function (m) {
+                const status = getStatus(m.expiryDate);
+                const card = document.createElement('div');
+                card.className = 'event-card';
+                card.dataset.expiry = m.expiryDate;
+
+                const statusLabel = status === 'expired' ? 'Expired' : status === 'danger' ? 'Expiring Very Soon' : status === 'warning' ? 'Expiring Soon' : 'Active';
+                const statusClass = 'status-' + status;
+
+                let ownerHtml = '';
+                if (isMembersOwnerLoggedIn) {
+                    const waMessage = encodeURIComponent(
+                        'Hi ' + m.name + ', this is a reminder from D\'Vintage Era Gym that your membership ' +
+                        (status === 'expired' ? 'has expired. Please renew your membership fee at the earliest.' : 'is expiring soon. Please renew your membership fee to continue enjoying our services.')
+                    );
+                    const waLink = 'https://wa.me/91' + m.phone.replace(/\D/g, '').slice(-10) + '?text=' + waMessage;
+                    const thisMonthPrefix = new Date().toISOString().slice(0, 7);
+                    const attendanceThisMonth = (m.attendance || []).filter(d => d.startsWith(thisMonthPrefix)).length;
+                    const markedToday = (m.attendance || []).includes(todayStr());
+
+                    let historyHtml = '';
+                    (m.history || []).slice().reverse().forEach(function (h) {
+                        historyHtml += '<div>' + formatDate(h.date) + ' — +' + h.daysAdded + ' days' + (h.note ? ' (' + escapeHtmlLocal(h.note) + ')' : '') + '</div>';
+                    });
+
+                    ownerHtml =
+                        '<div class="member-owner-details">' +
+                            '<div class="detail-row"><strong>Phone</strong><span>' + escapeHtmlLocal(m.phone) + '</span></div>' +
+                            '<div class="detail-row"><strong>Joined</strong><span>' + formatDate(m.startDate) + '</span></div>' +
+                            '<div class="detail-row"><strong>Present this month</strong><span>' + attendanceThisMonth + ' days</span></div>' +
+                        '</div>' +
+                        '<div class="member-card-actions">' +
+                            '<a href="' + waLink + '" target="_blank" rel="noopener noreferrer" class="btn member-whatsapp-btn">Message on WhatsApp</a>' +
+                            '<button type="button" class="btn member-renew-btn">Renew</button>' +
+                            '<button type="button" class="btn member-attendance-btn" ' + (markedToday ? 'disabled' : '') + '>' + (markedToday ? 'Marked Present Today' : 'Mark Present Today') + '</button>' +
+                            '<button type="button" class="btn btn-outline event-delete-btn">Remove Member</button>' +
+                        '</div>' +
+                        (historyHtml ?
+                            '<button type="button" class="member-history-toggle">View Fee History</button>' +
+                            '<div class="member-history-list">' + historyHtml + '</div>'
+                        : '');
+                }
+
+                card.innerHTML =
+                    (m.photoBase64 ? '<img class="member-card-photo" src="' + m.photoBase64 + '" alt="' + escapeHtmlLocal(m.name) + '">' : '') +
+                    '<div class="event-card-body">' +
+                        '<h3 class="member-card-name">' + escapeHtmlLocal(m.name) + '</h3>' +
+                        '<span class="member-status-badge ' + statusClass + '">' + statusLabel + '</span>' +
+                        '<div class="member-countdown-slot"></div>' +
+                        ownerHtml +
+                    '</div>';
+
+                membersGrid.appendChild(card);
+
+                if (isMembersOwnerLoggedIn) {
+                    const renewBtn = card.querySelector('.member-renew-btn');
+                    if (renewBtn) {
+                        renewBtn.addEventListener('click', function () {
+                            const input = prompt('Add how many days to ' + m.name + "'s membership?", '30');
+                            if (!input) return;
+                            const addDays = parseInt(input, 10);
+                            if (!addDays || addDays < 1) {
+                                alert('Please enter a valid number of days.');
+                                return;
+                            }
+                            const base = Math.max(Date.now(), m.expiryDate);
+                            const newExpiry = base + addDays * DAY_MS;
+                            const newHistoryEntry = { date: Date.now(), daysAdded: addDays, note: 'Renewed' };
+                            const updateFields = {
+                                expiryDate: newExpiry,
+                                history: (membersCollection && !String(m.id).startsWith('local_'))
+                                    ? firebase.firestore.FieldValue.arrayUnion(newHistoryEntry)
+                                    : (m.history || []).concat([newHistoryEntry])
+                            };
+                            saveMemberUpdate(m, updateFields).then(function () {
+                                m.expiryDate = newExpiry;
+                                m.history = (m.history || []).concat([newHistoryEntry]);
+                                renderMembers();
+                            }).catch(function (error) {
+                                console.error('Renew error:', error);
+                                alert('Could not renew this membership. Please try again.');
+                            });
+                        });
+                    }
+
+                    const attendanceBtn = card.querySelector('.member-attendance-btn');
+                    if (attendanceBtn && !attendanceBtn.disabled) {
+                        attendanceBtn.addEventListener('click', function () {
+                            const today = todayStr();
+                            const updateFields = {
+                                attendance: (membersCollection && !String(m.id).startsWith('local_'))
+                                    ? firebase.firestore.FieldValue.arrayUnion(today)
+                                    : (m.attendance || []).concat([today])
+                            };
+                            saveMemberUpdate(m, updateFields).then(function () {
+                                if (!(m.attendance || []).includes(today)) {
+                                    m.attendance = (m.attendance || []).concat([today]);
+                                }
+                                renderMembers();
+                            }).catch(function (error) {
+                                console.error('Attendance error:', error);
+                                alert('Could not mark attendance. Please try again.');
+                            });
+                        });
+                    }
+
+                    const deleteBtn = card.querySelector('.event-delete-btn');
+                    if (deleteBtn) {
+                        deleteBtn.addEventListener('click', function () {
+                            if (!confirm('Remove ' + m.name + ' from members? This cannot be undone.')) return;
+
+                            function finishDelete() {
+                                members = members.filter(function (x) { return x.id !== m.id; });
+                                renderMembers();
+                            }
+
+                            if (membersCollection && !String(m.id).startsWith('local_')) {
+                                membersCollection.doc(m.id).delete().then(finishDelete).catch(function (error) {
+                                    console.error('Error deleting member:', error);
+                                    alert('Could not remove this member. Please try again.');
+                                });
+                            } else {
+                                try {
+                                    const stored = localStorage.getItem('gymMembers');
+                                    const list = stored ? JSON.parse(stored) : [];
+                                    localStorage.setItem('gymMembers', JSON.stringify(list.filter(x => x.id !== m.id)));
+                                } catch (e) {
+                                    console.error('LocalStorage error (delete member):', e);
+                                }
+                                finishDelete();
+                            }
+                        });
+                    }
+
+                    const historyToggle = card.querySelector('.member-history-toggle');
+                    const historyList = card.querySelector('.member-history-list');
+                    if (historyToggle && historyList) {
+                        historyToggle.addEventListener('click', function () {
+                            historyList.classList.toggle('open');
+                        });
+                    }
+                }
+            });
+
+            startMemberCountdowns();
+        }
+
+        function startMemberCountdowns() {
+            function tick() {
+                membersGrid.querySelectorAll('.event-card').forEach(function (card) {
+                    const slot = card.querySelector('.member-countdown-slot');
+                    if (!slot) return;
+                    const expiry = Number(card.dataset.expiry);
+                    const diff = expiry - Date.now();
+
+                    if (diff <= 0) {
+                        slot.innerHTML = '<p class="member-countdown-text status-expired">Membership expired</p>';
+                        return;
+                    }
+
+                    const days = Math.floor(diff / DAY_MS);
+                    const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
+                    const minutes = Math.floor((diff / (1000 * 60)) % 60);
+                    const seconds = Math.floor((diff / 1000) % 60);
+
+                    const statusClass = diff <= 48 * 60 * 60 * 1000 ? 'status-danger' : diff <= 10 * DAY_MS ? 'status-warning' : 'status-ok';
+
+                    slot.innerHTML = '<p class="member-countdown-text ' + statusClass + '">' + days + 'd ' + hours + 'h ' + minutes + 'm ' + seconds + 's remaining</p>';
+                });
+            }
+            tick();
+            memberCountdownInterval = setInterval(tick, 1000);
+        }
+
+        initMembersFirebase();
+        loadMembers();
     })();
 
     // ==========================================
