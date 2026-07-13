@@ -97,6 +97,7 @@ body {
     font-weight: 800;
     letter-spacing: 2px;
     text-transform: uppercase;
+    white-space: nowrap;
 }
 
 .nav-menu {
@@ -1744,7 +1745,7 @@ body {
     }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 1500px) {
     .nav-menu {
         position: fixed;
         left: -100%;
@@ -1783,18 +1784,7 @@ body {
     }
 
     .social-icons {
-        margin-left: 1rem;
-        gap: 1rem;
-    }
-
-    .social-icons a {
-        width: 32px;
-        height: 32px;
-    }
-
-    .social-icons svg {
-        width: 18px;
-        height: 18px;
+        display: none;
     }
 
     .nav-toggle {
@@ -1812,7 +1802,9 @@ body {
     .nav-toggle.active span:nth-child(3) {
         transform: rotate(-45deg) translate(7px, -6px);
     }
+}
 
+@media (max-width: 768px) {
     .hero-content {
         grid-template-columns: 1fr;
         gap: 3rem;
