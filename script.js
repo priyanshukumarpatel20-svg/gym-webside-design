@@ -112,9 +112,10 @@ document.addEventListener('DOMContentLoaded', function () {
     // State variables
     let selectedRating = 0;
     let feedbackEntries = [];
-    let showAllFeedback = false;
+    let visibleFeedbackCount = 3;
     let sortMode = 'latest';
-    const MAX_FEEDBACK_VISIBLE = 4;
+    const FEEDBACK_INITIAL_VISIBLE = 3;
+    const FEEDBACK_INCREMENT = 2;
 
     // Check if Firebase is properly configured
     let firebaseReady = false;
@@ -185,7 +186,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         const sorted = getSortedFeedbacks();
-        const visible = showAllFeedback ? sorted : sorted.slice(0, MAX_FEEDBACK_VISIBLE);
+        const visible = sorted.slice(0, visibleFeedbackCount);
         const deviceId = getDeviceId();
 
         visible.forEach(entry => {
@@ -274,16 +275,26 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
 
-        if (sorted.length > MAX_FEEDBACK_VISIBLE) {
-            const toggleBtn = document.createElement('button');
-            toggleBtn.className = 'btn btn-outline';
-            toggleBtn.style.marginTop = '10px';
-            toggleBtn.textContent = showAllFeedback ? 'Show Less' : 'More';
-            toggleBtn.addEventListener('click', function() {
-                showAllFeedback = !showAllFeedback;
+        if (sorted.length > visibleFeedbackCount) {
+            const moreBtn = document.createElement('button');
+            moreBtn.className = 'btn btn-outline';
+            moreBtn.style.marginTop = '10px';
+            moreBtn.textContent = 'More';
+            moreBtn.addEventListener('click', function() {
+                visibleFeedbackCount += FEEDBACK_INCREMENT;
                 renderFeedbackList();
             });
-            feedbackList.appendChild(toggleBtn);
+            feedbackList.appendChild(moreBtn);
+        } else if (visibleFeedbackCount > FEEDBACK_INITIAL_VISIBLE && sorted.length > FEEDBACK_INITIAL_VISIBLE) {
+            const lessBtn = document.createElement('button');
+            lessBtn.className = 'btn btn-outline';
+            lessBtn.style.marginTop = '10px';
+            lessBtn.textContent = 'Show Less';
+            lessBtn.addEventListener('click', function() {
+                visibleFeedbackCount = FEEDBACK_INITIAL_VISIBLE;
+                renderFeedbackList();
+            });
+            feedbackList.appendChild(lessBtn);
         }
     }
 
@@ -446,7 +457,7 @@ document.addEventListener('DOMContentLoaded', function () {
             function finishSubmit() {
                 feedbackForm.reset();
                 setRating(0);
-                showAllFeedback = false;
+                visibleFeedbackCount = FEEDBACK_INITIAL_VISIBLE;
                 feedbackCompressedPhoto = null;
                 if (feedbackPhotoPreview) feedbackPhotoPreview.style.display = 'none';
                 loadReviews();
@@ -1169,6 +1180,9 @@ document.addEventListener('DOMContentLoaded', function () {
         let memberCountdownInterval = null;
         let isMembersOwnerLoggedIn = false;
         let searchTerm = '';
+        let visibleMembersCount = 3;
+        const MEMBERS_INITIAL_VISIBLE = 3;
+        const MEMBERS_INCREMENT = 2;
 
         function initMembersFirebase() {
             try {
@@ -1478,8 +1492,9 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             const sorted = [...filtered].sort((a, b) => a.expiryDate - b.expiryDate);
+            const visible = sorted.slice(0, visibleMembersCount);
 
-            sorted.forEach(function (m) {
+            visible.forEach(function (m) {
                 const status = getStatus(m.expiryDate);
                 const card = document.createElement('div');
                 card.className = 'event-card';
@@ -1622,6 +1637,28 @@ document.addEventListener('DOMContentLoaded', function () {
                     }
                 }
             });
+
+            if (sorted.length > visibleMembersCount) {
+                const moreBtn = document.createElement('button');
+                moreBtn.className = 'btn btn-outline';
+                moreBtn.style.marginTop = '10px';
+                moreBtn.textContent = 'More';
+                moreBtn.addEventListener('click', function () {
+                    visibleMembersCount += MEMBERS_INCREMENT;
+                    renderMembers();
+                });
+                membersGrid.appendChild(moreBtn);
+            } else if (visibleMembersCount > MEMBERS_INITIAL_VISIBLE && sorted.length > MEMBERS_INITIAL_VISIBLE) {
+                const lessBtn = document.createElement('button');
+                lessBtn.className = 'btn btn-outline';
+                lessBtn.style.marginTop = '10px';
+                lessBtn.textContent = 'Show Less';
+                lessBtn.addEventListener('click', function () {
+                    visibleMembersCount = MEMBERS_INITIAL_VISIBLE;
+                    renderMembers();
+                });
+                membersGrid.appendChild(lessBtn);
+            }
 
             startMemberCountdowns();
         }
